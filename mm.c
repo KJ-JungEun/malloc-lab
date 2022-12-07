@@ -24,11 +24,11 @@
  ********************************************************/
 team_t team = {
     /* 6 */
-    "sp",
+    "6",
     /* First member's full name */
-    "Park Jung Eun",
+    "",
     /* First member's email address */
-    "wjdeun04@naver.com",
+    "",
     /* Second member's full name (leave blank if none) */
     "",
     /* Second member's email address (leave blank if none) */
