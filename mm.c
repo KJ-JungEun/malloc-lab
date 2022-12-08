@@ -298,18 +298,30 @@ void *mm_realloc(void *bp, size_t size)
     {
         return bp;
     }
-
     else
     {
+        size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
         size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
-        size_t current_size = old_size + GET_SIZE(HDRP(NEXT_BLKP(bp)));
-
+        size_t next_size =  GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        size_t prev_size =  GET_SIZE(FTRP(PREV_BLKP(bp)));
+        size_t current_size  = old_size + next_size;
+        size_t current_size2  = old_size + prev_size;
+        
         // next block이 Free상태이고 old, next block의 사이즈 합이 new_size보다 크면 그냥 그거 바로 합쳐서 쓰기
-        if (!next_alloc && current_size >= new_size)
+        if (!next_alloc && (current_size >= new_size))
         {
             PUT(HDRP(bp), PACK(current_size, 1));
             PUT(FTRP(bp), PACK(current_size, 1));
             // place(bp, current_size-old_size);
+            return bp;
+        }
+        else if (!prev_alloc && (current_size2 >= new_size))
+        {
+            PUT(FTRP(bp), PACK(current_size2, 1));
+            PUT(HDRP(PREV_BLKP(bp)), PACK(current_size2, 1));
+            // place(bp, current_size-old_size);
+            memmove(PREV_BLKP(bp),bp,current_size2);
+            bp = PREV_BLKP(bp);
             return bp;
         }
         // 아니면 새로 block 만들어서 거기로 옮기기
@@ -317,8 +329,8 @@ void *mm_realloc(void *bp, size_t size)
         {
             void *new_bp = mm_malloc(new_size);
             place(new_bp, new_size);
-            memcpy(new_bp, bp, new_size); // 메모리의 특정한 부분으로부터 얼마까지의 부분을 다른 메모리 영역으로 복사해주는 함수(old_bp로부터 new_size만큼의 문자를 new_bp로 복사해라!)
             mm_free(bp);
+            memcpy(new_bp, bp, new_size); // 메모리의 특정한 부분으로부터 얼마까지의 부분을 다른 메모리 영역으로 복사해주는 함수(old_bp로부터 new_size만큼의 문자를 new_bp로 복사해라!)
             return new_bp;
         }
     }
