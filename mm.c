@@ -24,11 +24,11 @@
  ********************************************************/
 team_t team = {
     /* 6 */
-    "sp",
+    "6",
     /* First member's full name */
-    "Park Jung Eun",
+    "",
     /* First member's email address */
-    "wjdeun04@naver.com",
+    "",
     /* Second member's full name (leave blank if none) */
     "",
     /* Second member's email address (leave blank if none) */
@@ -58,14 +58,14 @@ team_t team = {
 #define GET_SIZE(p) (GET(p) & ~0x7)
 #define GET_ALLOC(p) (GET(p) & 0x1)
 /* Given block ptr bp, compute address of its header and footer */
-#define HDRP(bp) ((char *)(bp)-WSIZE)
+#define HDRP(bp) ((char *)(bp) - WSIZE)
 #define FTRP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
 /* Given block ptr bp, compute address of next and previous blocks */
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE(((char *)(bp)-WSIZE)))
-#define PREV_BLKP(bp) ((char *)(bp)-GET_SIZE(((char *)(bp)-DSIZE)))
+#define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE(((char *)(bp)-DSIZE)))
 /*=====================================================================*/
 
-#define FIND_FIT 2 // 1:First Fit, 2:Next Fit, 3:Best Fit
+#define FIND_FIT 3 // 1:First Fit, 2:Next Fit, 3:Best Fit
 
 // Declaration
 static void *heap_listp;
@@ -179,6 +179,30 @@ static void *find_fit(size_t asize)
 
 #elif FIND_FIT == 3
     /* Best-fit search */
+    void *bp;
+    void *best_bp = heap_listp;
+    char flag = 0;
+
+    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp))
+    {
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp))))
+        {
+            if(!flag)
+            {
+                flag = 1;
+                best_bp = bp;
+            } 
+            else if(GET_SIZE(HDRP(best_bp)) > GET_SIZE(HDRP(bp)) && flag)
+            {
+                best_bp = bp;
+            }
+            
+        }
+    }
+
+    if(flag) return best_bp;
+    else return NULL; /* No fit */
+    
 
 #endif
 }
@@ -280,7 +304,7 @@ static void place(void *bp, size_t asize)
 //     newbp = mm_malloc(size);
 //     if (newbp == NULL)
 //         return NULL;
-//     //copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+//   
 //     copySize = GET_SIZE(HDRP(oldbp));
 //     if (size < copySize)
 //         copySize = size;
@@ -298,39 +322,32 @@ void *mm_realloc(void *bp, size_t size)
     {
         return bp;
     }
+
     else
     {
-        size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
         size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
-        size_t next_size =  GET_SIZE(HDRP(NEXT_BLKP(bp)));
-        size_t prev_size =  GET_SIZE(FTRP(PREV_BLKP(bp)));
-        size_t current_size  = old_size + next_size;
-        size_t current_size2  = old_size + prev_size;
-        
-        // next block이 Free상태이고 old, next block의 사이즈 합이 new_size보다 크면 그냥 그거 바로 합쳐서 쓰기
-        if (!next_alloc && (current_size >= new_size))
+        size_t current_size = old_size + GET_SIZE(HDRP(NEXT_BLKP(bp)));
+
+        if (!next_alloc && current_size >= new_size)
         {
             PUT(HDRP(bp), PACK(current_size, 1));
             PUT(FTRP(bp), PACK(current_size, 1));
-            // place(bp, current_size-old_size);
+            // if(current_size - new_size > DSIZE) //내부 단편화를 막기 위해 나누려고 했으나 실패
+            // {
+            //     PUT(HDRP(bp), PACK(new_size, 1));
+            //     PUT(FTRP(bp), PACK(new_size, 1));
+            //     PUT(HDRP(NEXT_BLKP(bp)), PACK(current_size - new_size, 0));
+            //     PUT(FTRP(NEXT_BLKP(bp)), PACK(current_size - new_size, 0));
+            // }
+            
             return bp;
         }
-        else if (!prev_alloc && (current_size2 >= new_size))
-        {
-            PUT(FTRP(bp), PACK(current_size2, 1));
-            PUT(HDRP(PREV_BLKP(bp)), PACK(current_size2, 1));
-            // place(bp, current_size-old_size);
-            memmove(PREV_BLKP(bp),bp,current_size2);
-            bp = PREV_BLKP(bp);
-            return bp;
-        }
-        // 아니면 새로 block 만들어서 거기로 옮기기
         else
         {
             void *new_bp = mm_malloc(new_size);
             place(new_bp, new_size);
+            memcpy(new_bp, bp, new_size); 
             mm_free(bp);
-            memcpy(new_bp, bp, new_size); // 메모리의 특정한 부분으로부터 얼마까지의 부분을 다른 메모리 영역으로 복사해주는 함수(old_bp로부터 new_size만큼의 문자를 new_bp로 복사해라!)
             return new_bp;
         }
     }
